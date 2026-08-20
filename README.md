@@ -7,5 +7,6 @@ This is a tampermonkey userscript that automatically solves Google Minesweeper. 
 1. install tampermonkey browser extention
 2. create a new userscript in tampermonkey
 3. reaplce the default contents of the userscript with `minesweeper-bot.user.js`
-4. save the script and make sure the extension is enabled
-5. search up and click into google minesweeper and click the button at the bottom right of the screen
+4. change `CLICK_DELAY_MS` to the click delay time of your choosing (default set to 300ms)
+5. save the script and make sure the extension is enabled
+6. search up and click into google minesweeper and click the button at the bottom right of the screen
