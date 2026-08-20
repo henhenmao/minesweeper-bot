@@ -17,16 +17,26 @@ const UNKNOWN = -1;
 const UNREADABLE = -2;
 const MINE = -3;
 
-const DIRECTIONS = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]]; // all eight neighbors of a given cell
+const DIRECTIONS = [
+  [-1, -1],
+  [-1, 0],
+  [-1, 1],
+  [0, -1],
+  [0, 1],
+  [1, -1],
+  [1, 0],
+  [1, 1],
+]; // all eight neighbors of a given cell
 
 // cells are "r,c" strings inside solver sets
 const cellKey = (r, c) => `${r},${c}`;
 const parseCell = (key) => key.split(",").map(Number);
 
 // solver
-function neighbors(r, c, rows, cols) {
+function* neighbors(r, c, rows, cols) {
   for (const [i, j] of DIRECTIONS) {
-    const nr = r + i, nc = c + j;
+    const nr = r + i,
+      nc = c + j;
     if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) yield [nr, nc];
   }
 }
@@ -34,7 +44,8 @@ function neighbors(r, c, rows, cols) {
 function getConstraints(grid, unknown, safe, mines) {
   // for each numbered cell computes a Map with {key=cells: all unknown cells, val=counts: # of mines in cells}
 
-  const rows = grid.length, cols = grid[0].length;
+  const rows = grid.length,
+    cols = grid[0].length;
   const constraints = new Map();
 
   for (let r = 0; r < rows; r++) {
@@ -49,16 +60,22 @@ function getConstraints(grid, unknown, safe, mines) {
         if (mines.has(key)) flagged += 1;
         else if (unknown.has(key) && !safe.has(key)) cells.add(key);
       }
-      if (cells.size) constraints.set([...cells].sort().join("|"), { cells, count: curr - flagged });
+      if (cells.size)
+        constraints.set([...cells].sort().join("|"), {
+          cells,
+          count: curr - flagged,
+        });
     }
   }
   return [...constraints.values()]; // [list of {unknown cells:# mines in given list}]
 }
 
-function solve(grid, totalMines) {
+function solve(grid) {
   // returns the guaranteed-safe and guaranteed-mine cells as Sets of "r,c"
-  const rows = grid.length, cols = grid[0].length;
-  const safe = new Set(), mines = new Set();
+  const rows = grid.length,
+    cols = grid[0].length;
+  const safe = new Set(),
+    mines = new Set();
   const unknown = new Set();
 
   // find all unknown cells -> set of cells that the solver should try to solve
@@ -69,16 +86,27 @@ function solve(grid, totalMines) {
   const isSubset = (a, b) => [...a].every((x) => b.has(x));
 
   let changed = true; // state of whether or not the solver was able to do anything
-  while (changed) { // only stops repeating the solver when board cannot be further solved
+  while (changed) {
+    // only stops repeating the solver when board cannot be further solved
     changed = false;
     const constraints = getConstraints(grid, unknown, safe, mines);
 
     // checking obvious flags and safes
-    for (const {cells, count} of constraints) {
-      if (count === 0) { // contraints fulfilled, current mine is safe
-        for (const cell of cells) if (!safe.has(cell)) {safe.add(cell); changed = true;}
-      } else if (count === cells.size) { // # of mines = remaining tiles -> all remaining cells are mines
-        for (const cell of cells) if (!mines.has(cell)) {mines.add(cell); changed = true;}
+    for (const { cells, count } of constraints) {
+      if (count === 0) {
+        // contraints fulfilled, current mine is safe
+        for (const cell of cells)
+          if (!safe.has(cell)) {
+            safe.add(cell);
+            changed = true;
+          }
+      } else if (count === cells.size) {
+        // # of mines = remaining tiles -> all remaining cells are mines
+        for (const cell of cells)
+          if (!mines.has(cell)) {
+            mines.add(cell);
+            changed = true;
+          }
       }
     }
 
@@ -90,30 +118,49 @@ function solve(grid, totalMines) {
 
     for (const a of constraints) {
       for (const b of constraints) {
-        if (a === b || a.cells.size >= b.cells.size || !isSubset(a.cells, b.cells)) continue;
+        if (
+          a === b ||
+          a.cells.size >= b.cells.size ||
+          !isSubset(a.cells, b.cells)
+        )
+          continue;
         const diff = [...b.cells].filter((x) => !a.cells.has(x));
         const dn = b.count - a.count;
         if (dn === 0) {
-          for (const cell of diff) if (!safe.has(cell)) { safe.add(cell); changed = true; }
+          for (const cell of diff)
+            if (!safe.has(cell)) {
+              safe.add(cell);
+              changed = true;
+            }
         } else if (dn === diff.length) {
-          for (const cell of diff) if (!mines.has(cell)) { mines.add(cell); changed = true; }
+          for (const cell of diff)
+            if (!mines.has(cell)) {
+              mines.add(cell);
+              changed = true;
+            }
         }
       }
     }
   }
-  return {safe, mines};
+  return { safe, mines };
 }
-
 
 // i lowkey copy pasted 100% of the guessing functions from claude cause i dont know what to do when you have no more guaranteed moves left and you have to guess
 function connectedComponents(constraints) {
   // groups constraints into components of cells linked (directly or transitively) by appearing together in a constraint
   const parent = new Map();
   const find = (x) => {
-    while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); }
+    while (parent.get(x) !== x) {
+      parent.set(x, parent.get(parent.get(x)));
+      x = parent.get(x);
+    }
     return x;
   };
-  const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent.set(ra, rb); };
+  const union = (a, b) => {
+    const ra = find(a),
+      rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  };
 
   for (const { cells } of constraints) {
     for (const cell of cells) if (!parent.has(cell)) parent.set(cell, cell);
@@ -124,7 +171,8 @@ function connectedComponents(constraints) {
   const groups = new Map();
   for (const constraint of constraints) {
     const root = find(constraint.cells.values().next().value);
-    if (!groups.has(root)) groups.set(root, { cells: new Set(), constraints: [] });
+    if (!groups.has(root))
+      groups.set(root, { cells: new Set(), constraints: [] });
     const group = groups.get(root);
     for (const cell of constraint.cells) group.cells.add(cell);
     group.constraints.push(constraint);
@@ -145,7 +193,8 @@ function enumerateComponent(cells, constraints, cap = 25) {
 
   const constraintsOk = () => {
     for (const { cells: cset, count } of constraints) {
-      let knownMines = 0, unresolved = 0;
+      let knownMines = 0,
+        unresolved = 0;
       for (const c of cset) {
         const v = assignment[indexOf.get(c)];
         if (v === null) unresolved += 1;
@@ -159,7 +208,9 @@ function enumerateComponent(cells, constraints, cap = 25) {
   const backtrack = (i) => {
     if (i === list.length) {
       totalValid += 1;
-      for (const cell of list) if (assignment[indexOf.get(cell)] === 1) mineCounts.set(cell, mineCounts.get(cell) + 1);
+      for (const cell of list)
+        if (assignment[indexOf.get(cell)] === 1)
+          mineCounts.set(cell, mineCounts.get(cell) + 1);
       return;
     }
     for (const v of [0, 1]) {
@@ -176,7 +227,8 @@ function enumerateComponent(cells, constraints, cap = 25) {
 function guess(grid, totalMines, safe, mines) {
   // returns the single unknown "r,c" cell with the lowest estimated mine
   // probability; call only when solve() finds nothing
-  const rows = grid.length, cols = grid[0].length;
+  const rows = grid.length,
+    cols = grid[0].length;
   const unknown = new Set();
   for (let r = 0; r < rows; r++)
     for (let c = 0; c < cols; c++)
@@ -200,7 +252,10 @@ function guess(grid, totalMines, safe, mines) {
         const ratios = group.constraints
           .filter((k) => k.cells.has(cell))
           .map((k) => k.count / k.cells.size);
-        probability.set(cell, ratios.reduce((s, x) => s + x, 0) / ratios.length);
+        probability.set(
+          cell,
+          ratios.reduce((s, x) => s + x, 0) / ratios.length,
+        );
       }
       continue;
     }
@@ -215,44 +270,57 @@ function guess(grid, totalMines, safe, mines) {
     }
   }
 
-  const unconstrained = [...unknown].filter((cell) => !constrainedCells.has(cell));
+  const unconstrained = [...unknown].filter(
+    (cell) => !constrainedCells.has(cell),
+  );
   if (unconstrained.length) {
-    const remaining = Math.max(totalMines - mines.size - knownMinesInComponents, 0);
+    const remaining = Math.max(
+      totalMines - mines.size - knownMinesInComponents,
+      0,
+    );
     const baseProb = remaining / unconstrained.length;
     for (const cell of unconstrained) probability.set(cell, baseProb);
   }
 
   let best = null;
-  for (const [cell, p] of probability) if (best === null || p < probability.get(best)) best = cell;
+  for (const [cell, p] of probability)
+    if (best === null || p < probability.get(best)) best = cell;
   return best;
 }
 
 // vision for reading the board
 
-const GREENS = [[170, 215, 81], [162, 209, 73]];
-const TANS = [[229, 194, 159], [215, 184, 153], [236, 209, 183]];
+const GREENS = [
+  [170, 215, 81],
+  [162, 209, 73],
+];
+const TANS = [
+  [229, 194, 159],
+  [215, 184, 153],
+  [236, 209, 183],
+];
 const DIGIT_COLORS = [
-  [1, [25, 118, 210]],   // blue
-  [2, [56, 142, 60]],    // green
-  [3, [211, 47, 47]],    // red
-  [4, [123, 31, 162]],   // purple
-  [5, [255, 143, 0]],    // orange
-  [6, [0, 151, 167]],    // teal
-  [7, [66, 66, 66]],     // dark gray
-  [8, [149, 165, 166]],  // light gray
+  [1, [25, 118, 210]], // blue
+  [2, [56, 142, 60]], // green
+  [3, [211, 47, 47]], // red
+  [4, [123, 31, 162]], // purple
+  [5, [255, 143, 0]], // orange
+  [6, [0, 151, 167]], // teal
+  [7, [66, 66, 66]], // dark gray
+  [8, [149, 165, 166]], // light gray
 ];
 
 const MINE_LUMINANCE_THRESHOLD = 50;
 const SAMPLE_OFFSETS = [-0.1, -0.05, 0, 0.05, 0.1];
 
-const close = (a, b, tol = 30) => a.every((x, i) => Math.abs(x - b[i]) <= tol);
+const colorClose = (a, b, tol = 30) => a.every((x, i) => Math.abs(x - b[i]) <= tol);
 const luminance = ([r, g, b]) => 0.299 * r + 0.587 * g + 0.114 * b;
 
 function classifyPixel(px) {
-  for (const g of GREENS) if (close(px, g)) return "green";
-  for (const t of TANS) if (close(px, t)) return "tan";
+  for (const g of GREENS) if (colorClose(px, g)) return "green";
+  for (const t of TANS) if (colorClose(px, t)) return "tan";
   if (luminance(px) < MINE_LUMINANCE_THRESHOLD) return "mine";
-  for (const [n, color] of DIGIT_COLORS) if (close(px, color)) return n;
+  for (const [n, color] of DIGIT_COLORS) if (colorClose(px, color)) return n;
   return null;
 }
 
@@ -265,31 +333,43 @@ const DIFFICULTIES = [
 function detectDifficulty(width, height) {
   // cells are square, so the correct grid divides the canvas into equal
   // cell widths and heights; pick the difficulty minimizing the mismatch
-  let best = null, bestErr = Infinity;
+  let best = null,
+    bestErr = Infinity;
   for (const d of DIFFICULTIES) {
     const err = Math.abs(width / d.cols - height / d.rows);
-    if (err < bestErr) { bestErr = err; best = d; }
+    if (err < bestErr) {
+      bestErr = err;
+      best = d;
+    }
   }
   return best;
 }
 
 function readBoard(imageData, rows, cols) {
   const { data, width, height } = imageData;
-  const cellW = width / cols, cellH = height / rows;
+  const cellW = width / cols,
+    cellH = height / rows;
   const px = (x, y) => {
     const i = (y * width + x) * 4;
     return [data[i], data[i + 1], data[i + 2]];
   };
 
-  const grid = Array.from({ length: rows }, () => new Array(cols).fill(UNREADABLE));
+  const grid = Array.from({ length: rows }, () =>
+    new Array(cols).fill(UNREADABLE),
+  );
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      const cx = (c + 0.5) * cellW, cy = (r + 0.5) * cellH;
+      const cx = (c + 0.5) * cellW,
+        cy = (r + 0.5) * cellH;
       const votes = [];
       for (const fx of SAMPLE_OFFSETS)
         for (const fy of SAMPLE_OFFSETS)
-          votes.push(classifyPixel(px(Math.round(cx + fx * cellW), Math.round(cy + fy * cellH))));
+          votes.push(
+            classifyPixel(
+              px(Math.round(cx + fx * cellW), Math.round(cy + fy * cellH)),
+            ),
+          );
 
       const digits = votes.filter((v) => typeof v === "number");
       if (digits.length) {
@@ -310,7 +390,8 @@ function readBoard(imageData, rows, cols) {
 
 // decision
 function nextAction(grid, totalMines) {
-  const rows = grid.length, cols = grid[0].length;
+  const rows = grid.length,
+    cols = grid[0].length;
   let hasUnknown = false;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -321,7 +402,8 @@ function nextAction(grid, totalMines) {
   if (!hasUnknown) return { action: "win", cells: null };
 
   const { safe, mines } = solve(grid, totalMines);
-  if (safe.size) return { action: "click", cells: [...safe].sort().map(parseCell) };
+  if (safe.size)
+    return { action: "click", cells: [...safe].sort().map(parseCell) };
 
   // solver deduced every remaining unopened cell is a mine -> win even
   // though the board still visually shows unopened cells
@@ -331,7 +413,10 @@ function nextAction(grid, totalMines) {
       if (grid[r][c] === UNKNOWN && !mines.has(cellKey(r, c))) allMines = false;
   if (allMines) return { action: "win", cells: null };
 
-  return { action: "click", cells: [parseCell(guess(grid, totalMines, safe, mines))] };
+  return {
+    action: "click",
+    cells: [parseCell(guess(grid, totalMines, safe, mines))],
+  };
 }
 
 // clicker
@@ -342,7 +427,15 @@ async function clickCell(canvas, r, c, rows, cols) {
   const rect = canvas.getBoundingClientRect();
   const x = rect.left + ((c + 0.5) * rect.width) / cols;
   const y = rect.top + ((r + 0.5) * rect.height) / rows;
-  const opts = { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, pointerId: 1, isPrimary: true };
+  const opts = {
+    bubbles: true,
+    cancelable: true,
+    clientX: x,
+    clientY: y,
+    button: 0,
+    pointerId: 1,
+    isPrimary: true,
+  };
   canvas.dispatchEvent(new PointerEvent("pointerdown", opts));
   canvas.dispatchEvent(new MouseEvent("mousedown", opts));
   await sleep(PRESS_HOLD_MS);
@@ -390,7 +483,6 @@ let generation = 0;
 // down after a stop request.
 let activeRun = null;
 
-
 function detectGameOverModal() {
   const text = document.body.innerText;
   if (text.includes("Play again")) return "win";
@@ -427,7 +519,9 @@ async function dismissStaleModal() {
   const status = detectGameOverModal();
   if (!status) return;
   const label = status === "win" ? "Play again" : "Try again";
-  const el = [...document.querySelectorAll("button, div, span")].find((node) => node.textContent.trim() === label);
+  const el = [...document.querySelectorAll("button, div, span")].find(
+    (node) => node.textContent.trim() === label,
+  );
   if (el) el.click();
   // wait for the modal text to actually leave the DOM before returning:
   // a fixed sleep here can race the click's effect, and solveGame's first
@@ -436,7 +530,8 @@ async function dismissStaleModal() {
     if (!detectGameOverModal()) return;
     await sleep(STALE_MODAL_CLEAR_DELAY_MS);
   }
-  if (detectGameOverModal()) throw new Error("stale game-over modal did not clear");
+  if (detectGameOverModal())
+    throw new Error("stale game-over modal did not clear");
 }
 
 async function solveGame(button, myGeneration) {
@@ -447,7 +542,13 @@ async function solveGame(button, myGeneration) {
   let grid = await readBoardWithRetry(canvas, rows, cols, myGeneration);
   if (grid && grid.every((row) => row.every((v) => v === UNKNOWN))) {
     // fresh board: first click is always safe so click at the center
-    await clickCell(canvas, Math.floor(rows / 2), Math.floor(cols / 2), rows, cols);
+    await clickCell(
+      canvas,
+      Math.floor(rows / 2),
+      Math.floor(cols / 2),
+      rows,
+      cols,
+    );
     await sleep(CLICK_DELAY_MS);
   }
 
@@ -477,9 +578,17 @@ function injectButton() {
   const button = document.createElement("button");
   button.textContent = "▶ Solve";
   Object.assign(button.style, {
-    position: "fixed", bottom: "16px", right: "16px", zIndex: "99999",
-    padding: "10px 16px", background: "#4a752c", color: "white",
-    border: "none", borderRadius: "6px", fontSize: "14px", cursor: "pointer",
+    position: "fixed",
+    bottom: "16px",
+    right: "16px",
+    zIndex: "99999",
+    padding: "10px 16px",
+    background: "#4a752c",
+    color: "white",
+    border: "none",
+    borderRadius: "6px",
+    fontSize: "14px",
+    cursor: "pointer",
     fontFamily: "sans-serif",
   });
   button.addEventListener("click", () => {
@@ -498,7 +607,8 @@ function injectButton() {
         // if a stop click already bumped the generation, the run is stale:
         // show "stopped" (the throw skipped solveGame's own "stopped" line)
         // so the button never sticks on "solving…".
-        if (myGeneration === generation) button.textContent = "error (see console)";
+        if (myGeneration === generation)
+          button.textContent = "error (see console)";
         else button.textContent = "stopped";
       })
       .finally(() => {
@@ -523,7 +633,16 @@ if (typeof document !== "undefined") {
 
 if (typeof module !== "undefined") {
   module.exports = {
-    UNKNOWN, UNREADABLE, MINE, cellKey, parseCell, solve, guess,
-    nextAction, classifyPixel, detectDifficulty, readBoard,
+    UNKNOWN,
+    UNREADABLE,
+    MINE,
+    cellKey,
+    parseCell,
+    solve,
+    guess,
+    nextAction,
+    classifyPixel,
+    detectDifficulty,
+    readBoard,
   };
 }

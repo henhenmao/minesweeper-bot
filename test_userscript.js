@@ -12,7 +12,11 @@ const keys = (set) => [...set].sort();
   assert.deepStrictEqual(keys(mines), ["0,1"], "saturated");
 }
 {
-  const grid = [[0, 1, -1], [0, 1, -1], [0, 1, -1]];
+  const grid = [
+    [0, 1, -1],
+    [0, 1, -1],
+    [0, 1, -1],
+  ];
   const { safe, mines } = bot.solve(grid, 1);
   assert.deepStrictEqual(keys(safe), ["0,2", "2,2"], "subset rule safe");
   assert.deepStrictEqual(keys(mines), ["1,2"], "subset rule mines");
@@ -26,7 +30,10 @@ const keys = (set) => [...set].sort();
     [-1, -1, -1, -1, -1, -1],
   ];
   const result = bot.guess(grid, 3, new Set(), new Set());
-  assert(["2,0", "2,1", "2,2"].includes(result), `guess low-prob component, got ${result}`);
+  assert(
+    ["2,0", "2,1", "2,2"].includes(result),
+    `guess low-prob component, got ${result}`,
+  );
 }
 {
   const grid = [
@@ -46,14 +53,26 @@ console.log("solver tests passed");
   assert.strictEqual(bot.nextAction([[1, 0]], 0).action, "win");
 }
 {
-  const grid = [[0, 1, bot.UNKNOWN], [0, 1, bot.UNKNOWN], [0, 1, bot.UNKNOWN]];
+  const grid = [
+    [0, 1, bot.UNKNOWN],
+    [0, 1, bot.UNKNOWN],
+    [0, 1, bot.UNKNOWN],
+  ];
   const { action, cells } = bot.nextAction(grid, 1);
   assert.strictEqual(action, "click");
-  assert.deepStrictEqual(cells.map(String).sort(), ["0,2", "2,2"], "safe cells");
+  assert.deepStrictEqual(
+    cells.map(String).sort(),
+    ["0,2", "2,2"],
+    "safe cells",
+  );
 }
 {
   // solver deduces the last unknown is a mine -> win even though it looks unopened
-  assert.strictEqual(bot.nextAction([[1, bot.UNKNOWN]], 1).action, "win", "deduced win");
+  assert.strictEqual(
+    bot.nextAction([[1, bot.UNKNOWN]], 1).action,
+    "win",
+    "deduced win",
+  );
 }
 {
   const grid = [
@@ -79,19 +98,24 @@ console.log("solver tests passed");
 // -- detectDifficulty(): cells are square, so the right grid divides evenly --
 {
   assert.strictEqual(bot.detectDifficulty(540, 420).name, "medium"); // real medium canvas is 540x420 CSS
-  assert.strictEqual(bot.detectDifficulty(520, 416).name, "easy");   // 10x8 grid of 52px cells
-  assert.strictEqual(bot.detectDifficulty(504, 420).name, "hard");   // 24x20 grid of 21px cells
+  assert.strictEqual(bot.detectDifficulty(520, 416).name, "easy"); // 10x8 grid of 52px cells
+  assert.strictEqual(bot.detectDifficulty(504, 420).name, "hard"); // 24x20 grid of 21px cells
 }
 
 // -- readBoard() on a synthetic 1x2 board: green cell then tan cell --
 {
-  const cell = 30, width = 60, height = 30;
+  const cell = 30,
+    width = 60,
+    height = 30;
   const data = new Uint8ClampedArray(width * height * 4);
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const [r, g, b] = x < cell ? [170, 215, 81] : [229, 194, 159];
       const i = (y * width + x) * 4;
-      data[i] = r; data[i + 1] = g; data[i + 2] = b; data[i + 3] = 255;
+      data[i] = r;
+      data[i + 1] = g;
+      data[i + 2] = b;
+      data[i + 3] = 255;
     }
   }
   const grid = bot.readBoard({ data, width, height }, 1, 2);
