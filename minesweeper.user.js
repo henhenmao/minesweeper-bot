@@ -11,38 +11,38 @@
 
 "use strict";
 
-// constants (same codes as ur python bot)
+// constants (same codes as the previous python bot)
 
 const UNKNOWN = -1;
 const UNREADABLE = -2;
 const MINE = -3;
 
-const DIRECTIONS = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
+const DIRECTIONS = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]]; // all eight neighbors of a given cell
 
-// cells are "r,c" strings inside solver Sets (JS Sets lack tuple equality)
+// cells are "r,c" strings inside solver sets
 const cellKey = (r, c) => `${r},${c}`;
 const parseCell = (key) => key.split(",").map(Number);
 
 // solver
-
-function* neighbors(r, c, rows, cols) {
-  for (const [dr, dc] of DIRECTIONS) {
-    const nr = r + dr, nc = c + dc;
+function neighbors(r, c, rows, cols) {
+  for (const [i, j] of DIRECTIONS) {
+    const nr = r + i, nc = c + j;
     if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) yield [nr, nc];
   }
 }
 
 function getConstraints(grid, unknown, safe, mines) {
-  // for each numbered cell: its unresolved unknown neighbors and how many of
-  // them are mines; deduped by canonical cell-set key (mirrors Python's
-  // frozenset dict keys)
+  // for each numbered cell computes a Map with {key=cells: all unknown cells, val=counts: # of mines in cells}
+
   const rows = grid.length, cols = grid[0].length;
   const constraints = new Map();
+
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const curr = grid[r][c];
-      if (curr <= 0) continue;
-      const cells = new Set();
+      if (curr <= 0) continue; // skip cells with no number
+
+      const cells = new Set(); // set containing all neighbors of the current cell, excluding safes and mines
       let flagged = 0;
       for (const [nr, nc] of neighbors(r, c, rows, cols)) {
         const key = cellKey(nr, nc);
@@ -52,7 +52,7 @@ function getConstraints(grid, unknown, safe, mines) {
       if (cells.size) constraints.set([...cells].sort().join("|"), { cells, count: curr - flagged });
     }
   }
-  return [...constraints.values()];
+  return [...constraints.values()]; // [list of {unknown cells:# mines in given list}]
 }
 
 function solve(grid, totalMines) {
@@ -60,28 +60,34 @@ function solve(grid, totalMines) {
   const rows = grid.length, cols = grid[0].length;
   const safe = new Set(), mines = new Set();
   const unknown = new Set();
+
+  // find all unknown cells -> set of cells that the solver should try to solve
   for (let r = 0; r < rows; r++)
     for (let c = 0; c < cols; c++)
       if (grid[r][c] === UNKNOWN) unknown.add(cellKey(r, c));
 
   const isSubset = (a, b) => [...a].every((x) => b.has(x));
 
-  let changed = true;
-  while (changed) {
+  let changed = true; // state of whether or not the solver was able to do anything
+  while (changed) { // only stops repeating the solver when board cannot be further solved
     changed = false;
     const constraints = getConstraints(grid, unknown, safe, mines);
 
-    for (const { cells, count } of constraints) {
-      if (count === 0) {
-        for (const cell of cells) if (!safe.has(cell)) { safe.add(cell); changed = true; }
-      } else if (count === cells.size) {
-        for (const cell of cells) if (!mines.has(cell)) { mines.add(cell); changed = true; }
+    // checking obvious flags and safes
+    for (const {cells, count} of constraints) {
+      if (count === 0) { // contraints fulfilled, current mine is safe
+        for (const cell of cells) if (!safe.has(cell)) {safe.add(cell); changed = true;}
+      } else if (count === cells.size) { // # of mines = remaining tiles -> all remaining cells are mines
+        for (const cell of cells) if (!mines.has(cell)) {mines.add(cell); changed = true;}
       }
     }
+
     if (changed) continue;
 
-    // subset rule: if a's cells are a proper subset of b's, the difference
-    // carries b.count - a.count mines
+    // if no obvious mines or safes, use subset rule to find sneaky mines and safes
+    // subset rule: if a's cells are a subset of b's, the set difference (or complement) must contain b.count - a.count mines
+    // https://minesweeperblast.com/patterns/subset-safe-pattern/ for more info
+
     for (const a of constraints) {
       for (const b of constraints) {
         if (a === b || a.cells.size >= b.cells.size || !isSubset(a.cells, b.cells)) continue;
@@ -95,9 +101,11 @@ function solve(grid, totalMines) {
       }
     }
   }
-  return { safe, mines };
+  return {safe, mines};
 }
 
+
+// i lowkey copy pasted 100% of the guessing functions from claude cause i dont know what to do when you have no more guaranteed moves left and you have to guess
 function connectedComponents(constraints) {
   // groups constraints into components of cells linked (directly or transitively) by appearing together in a constraint
   const parent = new Map();
@@ -301,7 +309,6 @@ function readBoard(imageData, rows, cols) {
 }
 
 // decision
-
 function nextAction(grid, totalMines) {
   const rows = grid.length, cols = grid[0].length;
   let hasUnknown = false;
